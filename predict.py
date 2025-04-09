@@ -17,6 +17,7 @@ import subprocess
 import shutil
 import glob
 from zipfile import ZipFile
+import tempfile
 
 # List of URLs and destinations
 downloads = [
@@ -562,10 +563,13 @@ class Predictor(BasePredictor):
         print("Defining the base directory...")
         base_dir = os.path.abspath(f"./Model/{exp_dir}")
 
-        # Create a Zip file
-        print("Creating a Zip file...")
-        zip_file_path = os.path.join(base_dir, f"{exp_dir}.zip")
-        with ZipFile(zip_file_path, "w") as zipf:
+        # Create a temporary file for the zip output
+        with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as temp_zip:
+            temp_zip_path = temp_zip.name
+        
+        # Create a Zip file at the temporary location
+        print(f"Creating a Zip file at temporary location: {temp_zip_path}")
+        with ZipFile(temp_zip_path, "w") as zipf:
             # Add 'added_*.index' files
             print("Adding 'added_*.index' files to the Zip file...")
             for file in glob.glob(os.path.join(base_dir, "added_*.index")):
@@ -593,5 +597,9 @@ class Predictor(BasePredictor):
             else:
                 print(f"File not found: {exp_file}")
 
-        print(f"Zip file path: {zip_file_path}")
-        return CogPath(zip_file_path)
+        print(f"Zip file created at temporary path: {temp_zip_path}")
+        print(f"File exists: {os.path.exists(temp_zip_path)}")
+        print(f"File size: {os.path.getsize(temp_zip_path)} bytes")
+        
+        # Return the temporary file path as a CogPath
+        return CogPath(temp_zip_path)
