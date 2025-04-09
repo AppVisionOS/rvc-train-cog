@@ -67,7 +67,7 @@ build:
     - "fastapi==0.88"
     - "ffmpy==0.3.1"
     - "python-dotenv>=1.0.0"
-    - "av"
+    - "av==11.0.0"
 
   # commands run after the environment is setup
   run:
