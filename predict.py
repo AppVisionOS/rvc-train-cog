@@ -583,7 +583,7 @@ class Predictor(BasePredictor):
         # Execute 7z command to create archive
         try:
             subprocess.run(
-                ["7z", "a", "-t7z", "-mx=9", "-mmt=on", temp_7z_path] + files_to_add,
+                ["7z", "a", "-t7z", "-mx=7", "-mmt=on", temp_7z_path] + files_to_add,
                 cwd=base_dir,
                 check=True,
                 stdout=subprocess.PIPE,
