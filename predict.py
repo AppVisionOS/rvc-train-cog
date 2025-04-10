@@ -16,7 +16,6 @@ import os
 import subprocess
 import shutil
 import glob
-from zipfile import ZipFile
 import tempfile
 
 # List of URLs and destinations
