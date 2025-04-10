@@ -562,20 +562,28 @@ class Predictor(BasePredictor):
         print("Defining the base directory...")
         base_dir = os.path.abspath(f"./Model/{exp_dir}")
 
-       # Create a temporary path for 7z output (don't create the file)
-        temp_7z_path = tempfile.mktemp(suffix='.7z')
+        # Create a temporary path for 7z output (don't create the file)
+        temp_7z_path = tempfile.mktemp(suffix=".7z")
 
         # Collect list of files to compress (relative to base_dir)
         files_to_add = [
             f"{exp_dir}.pth",
-            *glob.glob("added_*.index", root_dir=base_dir),
-            *glob.glob("total_*.npy", root_dir=base_dir)
+            *[
+                os.path.relpath(f, base_dir)
+                for f in glob.glob(os.path.join(base_dir, "added_*.index"))
+            ],
+            *[
+                os.path.relpath(f, base_dir)
+                for f in glob.glob(os.path.join(base_dir, "total_*.npy"))
+            ],
+            # *glob.glob("added_*.index", root_dir=base_dir),
+            # *glob.glob("total_*.npy", root_dir=base_dir)
         ]
 
         # Execute 7z command to create archive
         try:
             subprocess.run(
-                ['7z', 'a', '-t7z', '-mx=9', temp_7z_path] + files_to_add,
+                ["7z", "a", "-t7z", "-mx=9", "-mmt=on", temp_7z_path] + files_to_add,
                 cwd=base_dir,
                 check=True,
                 stdout=subprocess.PIPE,
@@ -589,5 +597,5 @@ class Predictor(BasePredictor):
         # Verify archive was created
         if not os.path.exists(temp_7z_path):
             raise RuntimeError("7z archive not created")
-            
+
         return CogPath(temp_7z_path)
