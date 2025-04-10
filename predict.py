@@ -563,43 +563,41 @@ class Predictor(BasePredictor):
         print("Defining the base directory...")
         base_dir = os.path.abspath(f"./Model/{exp_dir}")
 
-        # Create a temporary file for the zip output
-        with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as temp_zip:
-            temp_zip_path = temp_zip.name
-        
-        # Create a Zip file at the temporary location
-        print(f"Creating a Zip file at temporary location: {temp_zip_path}")
-        with ZipFile(temp_zip_path, "w") as zipf:
-            # Add 'added_*.index' files
-            print("Adding 'added_*.index' files to the Zip file...")
-            for file in glob.glob(os.path.join(base_dir, "added_*.index")):
-                if os.path.exists(file):
-                    print(f"Adding file: {file}")
-                    zipf.write(file, arcname=os.path.basename(file))
-                else:
-                    print(f"File not found: {file}")
+         # Create a temporary file for the 7z output
+        with tempfile.NamedTemporaryFile(suffix='.7z', delete=False) as temp_7z:
+            temp_7z_path = temp_7z.name
 
-            # Add 'total_*.npy' files
-            print("Adding 'total_*.npy' files to the Zip file...")
-            for file in glob.glob(os.path.join(base_dir, "total_*.npy")):
-                if os.path.exists(file):
-                    print(f"Adding file: {file}")
-                    zipf.write(file, arcname=os.path.basename(file))
-                else:
-                    print(f"File not found: {file}")
+        # Collect the list of files to add (relative paths within base_dir)
+        files_to_add = []
+        # Add 'added_*.index' files
+        for file in glob.glob(os.path.join(base_dir, "added_*.index")):
+            if os.path.isfile(file):
+                files_to_add.append(os.path.basename(file))
+        # Add 'total_*.npy' files
+        for file in glob.glob(os.path.join(base_dir, "total_*.npy")):
+            if os.path.isfile(file):
+                files_to_add.append(os.path.basename(file))
+        # Add the model file
+        exp_file = os.path.join(base_dir, f"{exp_dir}.pth")
+        if os.path.isfile(exp_file):
+            files_to_add.append(os.path.basename(exp_file))
 
-            # Add specific file
-            print("Adding specific file to the Zip file...")
-            exp_file = os.path.join(base_dir, f"{exp_dir}.pth")
-            if os.path.exists(exp_file):
-                print(f"Adding file: {exp_file}")
-                zipf.write(exp_file, arcname=os.path.basename(exp_file))
-            else:
-                print(f"File not found: {exp_file}")
+        # Execute 7z command to compress the files
+        try:
+            subprocess.run(
+                ['7z', 'a', temp_7z_path] + files_to_add,
+                cwd=base_dir,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+        except subprocess.CalledProcessError as e:
+            print(f"7z compression failed: {e.stderr.decode()}")
+            raise
 
-        print(f"Zip file created at temporary path: {temp_zip_path}")
-        print(f"File exists: {os.path.exists(temp_zip_path)}")
-        print(f"File size: {os.path.getsize(temp_zip_path)} bytes")
-        
+        print(f"7z file created at temporary path: {temp_7z_path}")
+        print(f"File exists: {os.path.exists(temp_7z_path)}")
+        print(f"File size: {os.path.getsize(temp_7z_path)} bytes")
+
         # Return the temporary file path as a CogPath
-        return CogPath(temp_zip_path)
+        return CogPath(temp_7z_path)
