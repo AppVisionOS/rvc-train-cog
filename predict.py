@@ -6,11 +6,10 @@ import json
 import glob
 import time
 import shutil
-import zipfile
 import tempfile
 import pathlib
 import subprocess
-from typing import List, Tuple, Generator, Optional
+from typing import Tuple, Generator, Optional
 from concurrent.futures import ThreadPoolExecutor
 from random import shuffle
 
@@ -172,29 +171,6 @@ class FileManager:
                     shutil.rmtree(file_path)
 
     @staticmethod
-    def extract_dataset(dataset_path: str):
-        """Extract uploaded dataset zip file."""
-        print(f"Extracting dataset from {dataset_path}...")
-        with zipfile.ZipFile(dataset_path, "r") as zip_ref:
-            zip_ref.extractall(".")
-
-    @staticmethod
-    def detect_model_name(base_path: str) -> Optional[str]:
-        """Detect the model name from the dataset folder structure."""
-        print(f"Detecting model name in {base_path}...")
-
-        if not os.path.isdir(base_path):
-            print(f"Directory does not exist: {base_path}")
-            return None
-
-        dirs = [
-            d
-            for d in os.listdir(base_path)
-            if os.path.isdir(os.path.join(base_path, d))
-        ]
-        return dirs[0] if dirs else None
-
-    @staticmethod
     def prepare_directories(exp_dir: str):
         """Create necessary directories for the experiment."""
         os.makedirs(f"logs/{exp_dir}", exist_ok=True)
@@ -262,6 +238,25 @@ class FileManager:
             raise RuntimeError("7z archive not created")
 
         return temp_7z_path
+
+
+class WavDownloader:
+    """Handles downloading of WAV files in parallel."""
+
+    @staticmethod
+    def download_one(item: Tuple[int, str]) -> None:
+        idx, url = item
+        dest = f"dataset/data/split_{idx}.wav"
+        print(f"Downloading {url} to {dest}...")
+        subprocess.check_call(["pget", url, dest], close_fds=False)
+
+    @staticmethod
+    def download_all(wav_urls: list[str]) -> None:
+        """Download all WAV files concurrently."""
+        os.makedirs("dataset/data", exist_ok=True)
+        print("Downloading WAV files in parallel...")
+        with ThreadPoolExecutor() as executor:
+            executor.map(WavDownloader.download_one, enumerate(wav_urls))
 
 
 class WeightDownloader:
@@ -594,8 +589,8 @@ class Predictor(BasePredictor):
 
     def predict(
         self,
-        dataset_zip: CogPath = Input(
-            description="Upload dataset zip, zip should contain `dataset/<rvc_name>/split_<i>.wav`"
+        wav_urls: list[str] = Input(
+            description="List of WAV file URLs to use as dataset",
         ),
         sample_rate: str = Input(
             description="Sample rate", default="48k", choices=["40k", "48k"]
@@ -612,24 +607,24 @@ class Predictor(BasePredictor):
         try:
             # Clean workspace and extract dataset
             FileManager.clean_workspace()
-            FileManager.extract_dataset(str(dataset_zip))
 
-            # Detect model name from dataset directory
-            model_name = FileManager.detect_model_name("dataset")
-            if not model_name:
-                raise ValueError("Could not detect model name from dataset directory")
+            # Download dataset WAVs
+            WavDownloader.download_all(wav_urls)
 
-            # Set up parameters
-            exp_dir = model_name
-            sample_rate_hz = "40000" if sample_rate == "40k" else "48000"
-            dataset_path = f"dataset/{model_name}"
+            # Experiment directory is 'data'
+            exp_dir = "data"
+            dataset_path = f"dataset/{exp_dir}"
 
             # Create necessary directories
             FileManager.prepare_directories(exp_dir)
 
             # Process data
             print("Processing data...")
-            TrainModules.process_data(dataset_path, sample_rate_hz, exp_dir)
+            TrainModules.process_data(
+                dataset_path,
+                "40000" if sample_rate == "40k" else "48000",
+                exp_dir,
+            )
 
             # Extract features
             print("Extracting features...")
