@@ -460,18 +460,25 @@ class TrainModules:
         entries = []
         for name in names:
             if if_f0:
+                # Fix: Use separate string formatting rather than backslashes in f-string expressions
+                gt_path = gt_wavs_dir.replace("\\", "\\\\")
+                feat_path = feature_dir.replace("\\", "\\\\")
+                f0_path = f0_dir.replace("\\", "\\\\")
+                f0nsf_path = f0nsf_dir.replace("\\", "\\\\")
+
                 entries.append(
-                    f"{gt_wavs_dir.replace('\\', '\\\\')}/{name}.wav|"
-                    f"{feature_dir.replace('\\', '\\\\')}/{name}.npy|"
-                    f"{f0_dir.replace('\\', '\\\\')}/{name}.wav.npy|"
-                    f"{f0nsf_dir.replace('\\', '\\\\')}/{name}.wav.npy|"
+                    f"{gt_path}/{name}.wav|"
+                    f"{feat_path}/{name}.npy|"
+                    f"{f0_path}/{name}.wav.npy|"
+                    f"{f0nsf_path}/{name}.wav.npy|"
                     f"{spk_id}"
                 )
             else:
+                gt_path = gt_wavs_dir.replace("\\", "\\\\")
+                feat_path = feature_dir.replace("\\", "\\\\")
+
                 entries.append(
-                    f"{gt_wavs_dir.replace('\\', '\\\\')}/{name}.wav|"
-                    f"{feature_dir.replace('\\', '\\\\')}/{name}.npy|"
-                    f"{spk_id}"
+                    f"{gt_path}/{name}.wav|" f"{feat_path}/{name}.npy|" f"{spk_id}"
                 )
 
         # Add mute entries
