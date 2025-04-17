@@ -272,16 +272,24 @@ def prepare_training_filelist(exp_dir1, sr2, if_f0_3, spk_id5, version19):
     file_entries = []
     for name in names:
         if if_f0_3:
+            # Fixed path construction to avoid backslashes in f-string expressions
+            gt_path = gt_wavs_dir.replace("\\", "\\\\")
+            feat_path = feature_dir.replace("\\", "\\\\")
+            f0_path = f0_dir.replace("\\", "\\\\")
+            f0nsf_path = f0nsf_dir.replace("\\", "\\\\")
+
             file_entries.append(
-                f"{gt_wavs_dir.replace('\\', '\\\\')}\\{name}.wav|"
-                f"{feature_dir.replace('\\', '\\\\')}\\{name}.npy|"
-                f"{f0_dir.replace('\\', '\\\\')}\\{name}.wav.npy|"
-                f"{f0nsf_dir.replace('\\', '\\\\')}\\{name}.wav.npy|{spk_id5}"
+                f"{gt_path}\\{name}.wav|"
+                f"{feat_path}\\{name}.npy|"
+                f"{f0_path}\\{name}.wav.npy|"
+                f"{f0nsf_path}\\{name}.wav.npy|{spk_id5}"
             )
         else:
+            gt_path = gt_wavs_dir.replace("\\", "\\\\")
+            feat_path = feature_dir.replace("\\", "\\\\")
+
             file_entries.append(
-                f"{gt_wavs_dir.replace('\\', '\\\\')}\\{name}.wav|"
-                f"{feature_dir.replace('\\', '\\\\')}\\{name}.npy|{spk_id5}"
+                f"{gt_path}\\{name}.wav|" f"{feat_path}\\{name}.npy|{spk_id5}"
             )
 
     # Add mute samples
