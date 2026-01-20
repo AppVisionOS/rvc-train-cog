@@ -240,6 +240,133 @@ class FileManager:
         return temp_7z_path
 
 
+class AudioEnhancer:
+    """Handles audio denoising and enhancement using ClearerVoice-Studio."""
+
+    _instance = None
+    _model = None
+
+    @classmethod
+    def get_model(cls):
+        """Lazy-load the ClearerVoice model (singleton pattern)."""
+        if cls._model is None:
+            print("Loading ClearerVoice-Studio MossFormer2 model...")
+            from clearvoice import ClearVoice
+
+            cls._model = ClearVoice(
+                task="speech_enhancement", model_names=["MossFormer2_SE_48K"]
+            )
+            print("ClearerVoice model loaded successfully.")
+        return cls._model
+
+    @staticmethod
+    def enhance_file(input_path: str, output_path: str) -> None:
+        """Enhance a single audio file by removing noise."""
+        model = AudioEnhancer.get_model()
+        model(input_path=input_path, output_path=output_path, online_write=True)
+
+    @staticmethod
+    def enhance_directory(input_dir: str, output_dir: Optional[str] = None) -> None:
+        """Enhance all audio files in a directory.
+
+        Args:
+            input_dir: Directory containing audio files to enhance
+            output_dir: Output directory for enhanced files. If None, files are
+                       enhanced in-place (original files are replaced).
+        """
+        if output_dir is None:
+            # In-place enhancement: use temp directory then move back
+            temp_dir = tempfile.mkdtemp()
+            try:
+                print(f"Enhancing audio files in {input_dir}...")
+                model = AudioEnhancer.get_model()
+                model(input_path=input_dir, output_path=temp_dir, online_write=True)
+
+                # Move enhanced files back to original directory
+                for filename in os.listdir(temp_dir):
+                    src = os.path.join(temp_dir, filename)
+                    dst = os.path.join(input_dir, filename)
+                    shutil.move(src, dst)
+                print(f"Enhanced {len(os.listdir(input_dir))} audio files in-place.")
+            finally:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+        else:
+            os.makedirs(output_dir, exist_ok=True)
+            print(f"Enhancing audio files from {input_dir} to {output_dir}...")
+            model = AudioEnhancer.get_model()
+            model(input_path=input_dir, output_path=output_dir, online_write=True)
+            print(f"Enhanced audio files saved to {output_dir}.")
+
+    @staticmethod
+    def trim_silence_file(
+        input_path: str,
+        output_path: str,
+        top_db: int = 20,
+    ) -> float:
+        """Trim leading and trailing silence from an audio file.
+
+        Args:
+            input_path: Path to input audio file
+            output_path: Path to save trimmed audio
+            top_db: Threshold (in dB) below reference to consider as silence
+
+        Returns:
+            Duration of audio trimmed (in seconds)
+        """
+        import librosa
+        import soundfile as sf
+
+        # Load audio
+        y, sr = librosa.load(input_path, sr=None)
+        original_duration = len(y) / sr
+
+        # Trim silence from beginning and end
+        y_trimmed, _ = librosa.effects.trim(y, top_db=top_db)
+        trimmed_duration = len(y_trimmed) / sr
+
+        # Save trimmed audio
+        sf.write(output_path, y_trimmed, sr)
+
+        return original_duration - trimmed_duration
+
+    @staticmethod
+    def trim_silence_directory(
+        input_dir: str,
+        top_db: int = 20,
+    ) -> None:
+        """Trim silence from all audio files in a directory (in-place).
+
+        Args:
+            input_dir: Directory containing audio files
+            top_db: Threshold (in dB) below reference to consider as silence
+        """
+        import librosa
+        import soundfile as sf
+
+        audio_files = [
+            f for f in os.listdir(input_dir) if f.endswith((".wav", ".flac", ".mp3"))
+        ]
+        total_trimmed = 0.0
+
+        print(f"Trimming silence from {len(audio_files)} audio files...")
+        for filename in audio_files:
+            input_path = os.path.join(input_dir, filename)
+            try:
+                # Load, trim, and save in-place
+                y, sr = librosa.load(input_path, sr=None)
+                original_duration = len(y) / sr
+
+                y_trimmed, _ = librosa.effects.trim(y, top_db=top_db)
+                trimmed_duration = len(y_trimmed) / sr
+
+                sf.write(input_path, y_trimmed, sr)
+                total_trimmed += original_duration - trimmed_duration
+            except Exception as e:
+                print(f"Warning: Failed to trim {filename}: {e}")
+
+        print(f"Trimmed {total_trimmed:.2f}s of silence total from {len(audio_files)} files.")
+
+
 class WavDownloader:
     """Handles downloading of WAV files in parallel."""
 
@@ -251,12 +378,30 @@ class WavDownloader:
         subprocess.check_call(["pget", url, dest], close_fds=False)
 
     @staticmethod
-    def download_all(wav_urls: list[str]) -> None:
-        """Download all WAV files concurrently."""
+    def download_all(
+        wav_urls: list[str],
+        enhance_audio: bool = False,
+        trim_silence: bool = False,
+    ) -> None:
+        """Download all WAV files concurrently.
+
+        Args:
+            wav_urls: List of URLs to download
+            enhance_audio: If True, apply noise reduction to downloaded files
+            trim_silence: If True, trim leading/trailing silence from files
+        """
         os.makedirs("dataset/data", exist_ok=True)
         print("Downloading WAV files in parallel...")
         with ThreadPoolExecutor() as executor:
             executor.map(WavDownloader.download_one, enumerate(wav_urls))
+
+        if enhance_audio:
+            print("Applying audio enhancement (noise reduction)...")
+            AudioEnhancer.enhance_directory("dataset/data")
+
+        if trim_silence:
+            print("Trimming silence from audio files...")
+            AudioEnhancer.trim_silence_directory("dataset/data")
 
 
 class WeightDownloader:
@@ -603,13 +748,23 @@ class Predictor(BasePredictor):
         ),
         epoch: int = Input(description="Epoch", default=10),
         batch_size: str = Input(description="Batch size", default="7"),
+        enhance_audio: bool = Input(
+            description="Apply noise reduction to input audio using ClearerVoice-Studio MossFormer2.",
+            default=True,
+        ),
+        trim_silence: bool = Input(
+            description="Trim leading and trailing silence from audio files (preserves pauses between words).",
+            default=True,
+        ),
     ) -> CogPath:
         try:
             # Clean workspace and extract dataset
             FileManager.clean_workspace()
 
-            # Download dataset WAVs
-            WavDownloader.download_all(wav_urls)
+            # Download dataset WAVs (with optional audio enhancement and silence trimming)
+            WavDownloader.download_all(
+                wav_urls, enhance_audio=enhance_audio, trim_silence=trim_silence
+            )
 
             # Experiment directory is 'data'
             exp_dir = "data"
