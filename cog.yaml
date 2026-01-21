@@ -33,6 +33,7 @@ build:
     - apt-get update && apt-get install -y p7zip-full
     - pip install imageio[ffmpeg]
     - pip install torch==2.1.1+cu118 torchvision==0.16.1+cu118 torchaudio==2.1.1+cu118 -f https://download.pytorch.org/whl/torch_stable.html
+    - pip install clearvoice>=0.1.2
     - curl -o /usr/local/bin/pget -L "https://github.com/replicate/pget/releases/download/v0.0.6/pget" && chmod +x /usr/local/bin/pget
 
 # predict.py defines how predictions are run on your model
