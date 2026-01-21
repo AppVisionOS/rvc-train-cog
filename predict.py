@@ -279,8 +279,15 @@ class AudioEnhancer:
             temp_dir = tempfile.mkdtemp()
             try:
                 print(f"Enhancing audio files in {input_dir}...")
+                original_files = set(os.listdir(input_dir))
                 model = AudioEnhancer.get_model()
                 model(input_path=input_dir, output_path=temp_dir, online_write=True)
+
+                # Delete original files
+                for filename in original_files:
+                    original_path = os.path.join(input_dir, filename)
+                    if os.path.isfile(original_path):
+                        os.remove(original_path)
 
                 # Move enhanced files back to original directory
                 for filename in os.listdir(temp_dir):
@@ -395,9 +402,20 @@ class WavDownloader:
         with ThreadPoolExecutor() as executor:
             executor.map(WavDownloader.download_one, enumerate(wav_urls))
 
+        # Verify files were downloaded
+        downloaded_files = os.listdir("dataset/data")
+        if not downloaded_files:
+            raise RuntimeError("No audio files were downloaded")
+        print(f"Downloaded {len(downloaded_files)} audio files.")
+
         if enhance_audio:
             print("Applying audio enhancement (noise reduction)...")
             AudioEnhancer.enhance_directory("dataset/data")
+            # Verify enhancement didn't lose files
+            enhanced_files = os.listdir("dataset/data")
+            if not enhanced_files:
+                raise RuntimeError("Audio enhancement failed - no output files")
+            print(f"Enhancement complete: {len(enhanced_files)} files.")
 
         if trim_silence:
             print("Trimming silence from audio files...")
