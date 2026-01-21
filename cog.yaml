@@ -12,6 +12,14 @@ build:
     - "libgl1-mesa-glx"
     - "libglib2.0-0"
     - "nvidia-cudnn"
+    - "ffmpeg"
+    - "libavformat-dev"
+    - "libavcodec-dev"
+    - "libavdevice-dev"
+    - "libavutil-dev"
+    - "libavfilter-dev"
+    - "libswscale-dev"
+    - "libswresample-dev"
 
   # python version in the form '3.11' or '3.11.4'
   python_version: "3.9.18"
@@ -70,8 +78,7 @@ build:
   # commands run after the environment is setup
   run:
     - pip install --upgrade pip
-    - apt-get update && apt-get install -y ffmpeg
-    - apt-get install -y p7zip-full
+    - apt-get update && apt-get install -y p7zip-full
     - pip install imageio[ffmpeg]
     - pip install torch==2.1.1+cu118 torchvision==0.16.1+cu118 torchaudio==2.1.1+cu118 -f https://download.pytorch.org/whl/torch_stable.html
     - curl -o /usr/local/bin/pget -L "https://github.com/replicate/pget/releases/download/v0.0.6/pget" && chmod +x /usr/local/bin/pget
